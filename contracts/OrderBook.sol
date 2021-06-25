@@ -10,15 +10,16 @@ struct Order {
     uint256 amountE8;
 }
 
+// Ordered order book, based on array, works like linked lists.
 contract OrderBook {
     struct Item {
-        uint32 next;
+        uint32 next;  // index of next order
         Order order;
     }
 
     uint16 pairId; // <tokenId1>(8) <tokenId2>(8)
     uint32 first;
-    uint32 count;
+    uint32 count;  // order amount
     Item[] items;
     uint32 constant NONE = uint32(0);
 
@@ -33,7 +34,9 @@ contract OrderBook {
         count = 0;
     }
 
-    // Add an new order
+    /** 
+    Add an new order
+    */
     function append(
         uint256 _price,
         uint256 _amount,
@@ -58,7 +61,9 @@ contract OrderBook {
         }
     }
 
-    // Remove an order by index
+    /** 
+    Remove an order by index
+    */ 
     function remove(uint32 index) public {
         uint32 prevIndex = _findPrevIndex(index);
         // It is the first order
@@ -71,18 +76,25 @@ contract OrderBook {
         count--;
     }
 
-    function findOrder(uint32 _orderId) public view returns (uint32) {
-        return idToIndex[_orderId];
+    /** 
+    Find order by index, return 
+    */ 
+    function findOrder(uint32 _orderId) public view returns (Order) {
+        return items[idToIndex[_orderId]].order;
     }
 
     function changePrice(uint32 _orderId, uint256 newPrice) public {}
 
     function changeAmount(uint32 _orderId, uint256 newAmount) public {}
 
-    // Look for possible deal.
+    /** 
+    Look for possible deal. 
+    @param _price excepted price.
+    @return the index of tradable order.
+    */
     function findDeal(
         uint256 _price
-    ) public returns (uint32) {
+    ) public view returns (uint32) {
         uint32 index = first;
         while (index != NONE) {
             if (items[index].order.priceE8 < _price) {
@@ -93,15 +105,17 @@ contract OrderBook {
         return index;
     }
 
+    /** 
+    Assert current price is between previous order and next order. This function works with function _findIndex() to find the position where the new order is inserted.
+    */
     function _veryfiyIndex(
         uint32 prevOrder,
         uint32 nextOrder,
-        uint256 newprice
+        uint256 price
     ) internal view returns (bool) {
         return
-            (prevOrder == 0 || items[prevOrder].order.priceE8 <= newprice) &&
-            ((nextOrder == items.length - 1) ||
-                items[nextOrder].order.priceE8 > newprice);
+            (prevOrder == 0 || items[prevOrder].order.priceE8 <= price) &&
+            ((nextOrder == items.length - 1) || items[nextOrder].order.priceE8 > price);
     }
 
     function _findIndex(uint256 newprice) internal view returns (uint32 index) {
@@ -114,6 +128,9 @@ contract OrderBook {
         }
     }
 
+    /**
+    Find index of previous order.
+    */
     function _findPrevIndex(uint32 index) internal view returns (uint32) {
         if (index == first) return NONE;
         uint32 curr = first;
