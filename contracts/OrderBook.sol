@@ -26,8 +26,6 @@ contract OrderBook {
     // Mapping from orderId to index.
     mapping(uint32 => uint32) idToIndex;
 
-    event DealCompleted(uint32 orderId, uint256 amount, address taker);
-
     constructor(uint16 _pairId) {
         pairId = _pairId;
         first = NONE;
@@ -45,12 +43,11 @@ contract OrderBook {
     ) public {
         // Order book is full.
         uint32 index = uint32(items.length);
-        if (index > 0xFFFFFFFF) revert();
+        if (index == 0xFFFFFFFF) revert();
         items.push(Item(NONE, Order(_orderId, 0, _maker, _price, _amount)));
         idToIndex[_orderId] = index;
         // It is the first item.
-        if (first == NONE) {
-            require(first != NONE || count != 0);
+        if (count == 0) {
             first = index;
             count = 1;
         } else {
@@ -65,11 +62,11 @@ contract OrderBook {
     Remove an order by index
     */ 
     function remove(uint32 index) public {
-        uint32 prevIndex = _findPrevIndex(index);
         // It is the first order
-        if (prevIndex == NONE) {
-            first = items[prevIndex].next;
+        if (index == first) {
+            first = items[index].next;
         } else {
+            uint32 prevIndex = _findPrevIndex(index);
             items[prevIndex].next = items[index].next;
         }
         delete items[index];
@@ -79,13 +76,17 @@ contract OrderBook {
     /** 
     Find order by index, return 
     */ 
-    function findOrder(uint32 _orderId) public view returns (Order) {
-        return items[idToIndex[_orderId]].order;
+    function findOrder(uint32 _index) public view returns (Order memory) {
+        return items[idToIndex[_index]].order;
     }
 
-    function changePrice(uint32 _orderId, uint256 newPrice) public {}
+    function changePrice(uint32 _orderId, uint256 newPrice) public {
+        //Todo
+    }
 
-    function changeAmount(uint32 _orderId, uint256 newAmount) public {}
+    function changeAmount(uint32 _orderId, uint256 newAmount) public {
+        //Todo
+    }
 
     /** 
     Look for possible deal. 
@@ -108,20 +109,20 @@ contract OrderBook {
     /** 
     Assert current price is between previous order and next order. This function works with function _findIndex() to find the position where the new order is inserted.
     */
-    function _veryfiyIndex(
-        uint32 prevOrder,
+    function _verifyIndex(
+        uint32 currOrder,
         uint32 nextOrder,
         uint256 price
     ) internal view returns (bool) {
         return
-            (prevOrder == 0 || items[prevOrder].order.priceE8 <= price) &&
-            ((nextOrder == items.length - 1) || items[nextOrder].order.priceE8 > price);
+            (items[currOrder].order.priceE8 <= price) &&
+            (nextOrder == NONE || items[nextOrder].order.priceE8 > price);
     }
 
     function _findIndex(uint256 newprice) internal view returns (uint32 index) {
         index = first;
         while (true) {
-            if (_veryfiyIndex(index, items[index].next, newprice)) {
+            if (_verifyIndex(index, items[index].next, newprice)) {
                 return index;
             }
             index = items[index].next;

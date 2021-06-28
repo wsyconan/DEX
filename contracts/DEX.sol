@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "hardhat/console.sol";
 import "./OrderBook.sol";
-import "../node_modules/hardhat/console.sol";
+//import "../node_modules/hardhat/console.sol";
+
 
 interface Token {
     function balanceOf(address account) external view returns (uint256);
@@ -31,22 +33,26 @@ contract DEX {
     mapping(string => TokenInfo) public tokens;
     mapping(uint16 => OrderBook) public orderBooks;
 
-    event AddToOrderBook(uint32);
+    event AddToOrderBook(uint32 orderId);
 
     constructor(address _admin) {
         admin = _admin;
         orderCounter = 1;
         setToken(1, "WBNB", WBNBAddr);
         setToken(2, "BUSD", BUSDAddr);
-        // Need a function to automatically generate order books.
+        console.log("Contract address Token WBNB: %s.", WBNBAddr);
+        console.log("Contract address Token BUSD: %s.", BUSDAddr);
+        //Todo: Need a function to automatically generate order books.
         uint16 _pairId1 = uint16(1) | uint16(2 << 8);
         uint16 _pairId2 = uint16(2) | uint16(1 << 8);
         orderBooks[_pairId1] = new OrderBook(_pairId1);
         orderBooks[_pairId2] = new OrderBook(_pairId2);
+        console.log("Add an order book, pairId is: %s.", _pairId1);
+        console.log("Add an order book, pairId is: %s.", _pairId2);
     }
 
     /**
-    
+    Add an ERC20 token in DEX
     @param _tokenCode code of the Token
     @param _symbol symbol of the Token
     @param _address Contract address of the Token
@@ -55,16 +61,17 @@ contract DEX {
         uint8 _tokenCode,
         string memory _symbol,
         address _address
-    ) private {
+    ) public {
+        require(msg.sender == admin);
         tokens[_symbol] = TokenInfo(_tokenCode, _symbol, _address);
     }
 
     /**
     This function is used to initiate an exchange.
     @param token1 current token
-    @param token2 target currency
-    @param _price excepted price. Formula - target currency/current token
-    @param _amount exchange amount
+    @param token2 target token
+    @param _price excepted price. Formula - target token/current token
+    @param _amount exchange amount(current token)
     */
     function initOrder(
         string memory token1,
@@ -72,9 +79,8 @@ contract DEX {
         uint256 _price,
         uint256 _amount
     ) public {
-        require(
-            Token(tokens[token1].tokenAddr).balanceOf(msg.sender) >= _amount
-        );
+        require(Token(tokens[token1].tokenAddr).balanceOf(msg.sender) >= _amount);
+        console.log("Address of order maker is: %s", msg.sender);
         uint8 tokenCode1 = tokens[token1].tokenCode;
         uint8 tokenCode2 = tokens[token2].tokenCode;
         uint16 _pairId1 = (tokenCode1 << 8) | (tokenCode2);
@@ -82,6 +88,7 @@ contract DEX {
         // Find an tradable order, return it's index.
         uint32 index = orderBooks[_pairId1].findDeal(_price);
         while (index != uint32(0) && _amount > 0) {
+            console.log("There is a tradable order.");
             Order memory temp = orderBooks[_pairId1].findOrder(index);
             // To do
             if (temp.amountE8 < _amount) {
@@ -127,5 +134,8 @@ contract DEX {
         address _to,
         string memory token,
         uint256 _amount
-    ) private {}
+    ) private {
+        require(Token(tokens[token].tokenAddr).balanceOf(_from) >= _amount);
+        Token(tokens[token].tokenAddr).transferFrom(_from, _to, _amount);
+    }
 }
