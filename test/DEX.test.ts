@@ -1,27 +1,30 @@
-import { expect } from "./chai-setup";
-import { setupUsers, setupUser } from "./utils";
-import { ethers, deployments, getNamedAccounts, getUnnamedAccounts } from 'hardhat';
-
-async function setup() {
-    await deployments.fixture(["DEX"]);
-    const contracts = {
-        DEX: (await ethers.getContract('DEX')),
-    };
-
-    //const users = await getUnamedAccounts();
-
-    const {trader1} = await getNamedAccounts();
-    const {trader2} = await getNamedAccounts();
-    const {deployer} = await getNamedAccounts();
-
-    return {
-        ...contracts,
-        trader1: await setupUser(trader1, contracts),
-        trader2: await setupUser(trader2, contracts),
-    };
-}
+import { expect } from "./chai-setup"
+import { tokens } from "./utils/index"
+import { ethers, deployments, getUnnamedAccounts } from 'hardhat'
+import {setupUsers, setupUser} from './utils';
+import { Contract, Signer } from "ethers"
 
 describe("DEX contract", function () {
+    
+    async function setup() {
+        const contracts = {
+            DEX: await ethers.getContract('DEX'),
+            BUSD: await (await ethers.getContractFactory("TestERC20")).deploy("BUSD", "BUSD"),
+            WBNB: await (await ethers.getContractFactory("TestERC20")).deploy("WBNB", "WBNB")
+        };
+        const traders = await setupUsers(contracts);
+        //const traderss = ethers.getSigners();
+        for (const trader of traders) {
+            await contracts.BUSD.transfer(trader.address, tokens(10_000))
+            await contracts.WBNB.transfer(trader.address, tokens(10_000))
+        }
+
+        return {
+            ...contracts,
+            traders,
+        }
+    }
+
     describe("Should initialize DEX.", function () {
         it("Should set Tokens.", async function () {
             await deployments.fixture(["DEX"]);
@@ -40,10 +43,12 @@ describe("DEX contract", function () {
 
     describe("Should initialize orders.", function () {
         it("New order should be saved to order book.", async function () {
-            //await deployments.fixture(["DEX"]);
-            const {DEX, trader1} = await setup();
+            await deployments.fixture(["DEX"]);
+            const {DEX, traders} = await setup();
             //expect(DEX.deployed()).equal(true);
-            await trader1.DEX.initOrder("WBNB", "BUSD", 10, 1);
+            await traders[0].WBNB.approve(DEX.address, 10);
+            await traders[0].DEX.initOrder("WBNB", "BUSD", 10, 1);
+
             expect(DEX.orderBooks[513].count).equal(1);
         });
 
