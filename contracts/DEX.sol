@@ -9,12 +9,12 @@ import "./OrderBook.sol";
 
 interface Token {
     function balanceOf(address account) external view returns (uint256);
-
     function transferFrom(
         address sender,
         address recipient,
         uint256 amount
     ) external returns (bool);
+    function allowance(address owner, address spender) external view returns(uint256);
 }
 
 contract DEX {
@@ -90,22 +90,45 @@ contract DEX {
         while (index != uint32(0) && _amount > 0) {
             console.log("There is a tradable order.");
             Order memory temp = orderBooks[_pairId1].findOrder(index);
-            // To do
             if (temp.amountE8 < _amount) {
-                //To do
-                _amount -= temp.amountE8;
-                orderBooks[_pairId1].remove(index);
+                // Transfer successful.
+                if(transferToken(
+                    msg.sender,
+                    temp.maker,
+                    token1,
+                    token2,
+                    temp.amountE8,
+                    _price
+                )){
+                    _amount -= temp.amountE8;
+                    orderBooks[_pairId1].remove(index);
+                }
             } else if (temp.amountE8 > _amount) {
-                // To do
-                orderBooks[_pairId1].changeAmount(
-                    index,
-                    temp.amountE8 - _amount
-                );
-                _amount = 0;
+                // Transfer successful.
+                if(transferToken(
+                    msg.sender,
+                    temp.maker,
+                    token1,
+                    token2,
+                    _amount,
+                    _price
+                )) {
+                    orderBooks[_pairId1].changeAmount(index, temp.amountE8 -= _amount);
+                    _amount = 0;
+                }
+
             } else {
-                // To do
-                _amount = 0;
-                orderBooks[_pairId1].remove(index);
+                if(transferToken(
+                    msg.sender,
+                    temp.maker,
+                    token1,
+                    token2,
+                    _amount,
+                    _price
+                )){
+                    _amount = 0;
+                    orderBooks[_pairId1].remove(index);
+                }
             }
             index = orderBooks[_pairId1].findDeal(_price);
         }
@@ -123,19 +146,27 @@ contract DEX {
     }
 
     /**
-    Use function transferFrom() to send ERC20 token
-    @param _from sender 
-    @param _to recipient
-    @param token name of token to be sent
-    @param _amount amount sent 
+    Use function transferFrom() to make the deal.
+    trader1 send token1 to trader2, and trader2 send trader1 token1
+    @param trader1 sender 
+    @param trader2 recipient
+    @param token1 name of token1
+    @param token2 name of token2
+    @param _amount amount of token1
+    @param _price price of token2 exchange token1
     */
     function transferToken(
-        address _from,
-        address _to,
-        string memory token,
-        uint256 _amount
-    ) private {
-        require(Token(tokens[token].tokenAddr).balanceOf(_from) >= _amount);
-        Token(tokens[token].tokenAddr).transferFrom(_from, _to, _amount);
+        address trader1,
+        address trader2,
+        string memory token1,
+        string memory token2,
+        uint256 _amount,
+        uint256 _price
+    ) private returns(bool) {
+        require(Token(tokens[token1].tokenAddr).allowance(trader1, address(this)) >= _amount / 10 ** 8);
+        require(Token(tokens[token2].tokenAddr).allowance(trader2, address(this)) >= (_price/ 10 ** 8) * (_amount / 10 ** 8));
+        require(Token(tokens[token1].tokenAddr).balanceOf(trader1) >= _amount / 10 ** 8);
+        require(Token(tokens[token2].tokenAddr).balanceOf(trader2) >= (_price/ 10 ** 8) * (_amount / 10 ** 8));
+        return (Token(tokens[token1].tokenAddr).transferFrom(trader1, trader2, _amount / 10 ** 8) && Token(tokens[token2].tokenAddr).transferFrom(trader2, trader1, (_price/ 10 ** 8) * (_amount / 10 ** 8)));
     }
 }

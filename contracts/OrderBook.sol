@@ -49,13 +49,12 @@ contract OrderBook {
         // It is the first item.
         if (count == 0) {
             first = index;
-            count = 1;
         } else {
             uint32 prevIndex = _findIndex(_price);
             items[index].next = items[prevIndex].next;
             items[prevIndex].next = index;
-            count++;
         }
+        count++;
     }
 
     /** 
@@ -74,10 +73,10 @@ contract OrderBook {
     }
 
     /** 
-    Find order by index, return 
+    Find order by index
     */ 
     function findOrder(uint32 _index) public view returns (Order memory) {
-        return items[idToIndex[_index]].order;
+        return items[_index].order;
     }
 
     function changePrice(uint32 _orderId, uint256 newPrice) public {
@@ -85,7 +84,7 @@ contract OrderBook {
     }
 
     function changeAmount(uint32 _orderId, uint256 newAmount) public {
-        //Todo
+        items[idToIndex[_orderId]].order.amountE8 = newAmount;
     }
 
     /** 
